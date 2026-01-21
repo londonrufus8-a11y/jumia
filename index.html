@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DF Plus Store</title>
+<link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<style>
+body {font-family: 'Roboto', sans-serif; margin:0; padding:0; background:#f5f5f5;}
+header {background:#ff9900; padding:10px 20px; display:flex; justify-content:space-between; align-items:center;}
+header .logo {font-size:24px; font-weight:bold; color:#fff;}
+header input {padding:5px 10px; width:50%; border-radius:4px; border:none;}
+header .cart {position:relative; cursor:pointer; color:#fff; font-weight:bold;}
+header .cart span {position:absolute; top:-8px; right:-8px; background:red; color:#fff; border-radius:50%; padding:2px 6px; font-size:12px;}
+.hero {background:#ffe0b3; padding:40px 20px; text-align:center; margin-bottom:20px; border-bottom: 2px solid #ff9900;}
+.hero h1 {margin:0; font-size:28px; color:#333;}
+.hero p {margin:10px 0 0; font-size:16px; color:#555;}
+.filters {display:flex; justify-content:center; margin:20px 0;}
+.filters button {margin:0 10px; padding:10px 20px; border:none; background:#ff9900; color:#fff; border-radius:4px; cursor:pointer;}
+.filters button.active {background:#e68a00;}
+.products {display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:20px; padding:0 20px;}
+.product {background:#fff; padding:10px; border-radius:8px; box-shadow:0 2px 5px rgba(0,0,0,0.1); display:flex; flex-direction:column; align-items:center; position:relative; transition: transform 0.2s, box-shadow 0.2s;}
+.product:hover {transform: translateY(-5px); box-shadow:0 5px 15px rgba(0,0,0,0.2);}
+.product img {width:100%; max-height:150px; object-fit:contain; margin-bottom:10px;}
+.product h3 {font-size:16px; margin:5px 0; text-align:center;}
+.price {font-weight:bold; margin-bottom:5px;}
+.old-price {text-decoration:line-through; color:#888; margin-right:5px;}
+.badge {position:absolute; top:10px; left:10px; background:red; color:#fff; padding:3px 6px; font-size:12px; border-radius:3px;}
+.product button {background:#ff9900; border:none; padding:8px 12px; color:#fff; border-radius:4px; cursor:pointer; margin-top:auto;}
+/* Cart Overlay */
+.cart-overlay {position:fixed; top:0; right:-400px; width:350px; height:100%; background:#fff; box-shadow:-2px 0 8px rgba(0,0,0,0.2); transition:0.3s; padding:20px; overflow-y:auto; z-index:1000;}
+.cart-overlay.active {right:0;}
+.cart-overlay h2 {margin-top:0;}
+.cart-item {display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;}
+.cart-item img {width:50px; height:50px; object-fit:contain;}
+.cart-item .qty {display:flex; align-items:center;}
+.cart-item button {margin:0 5px; padding:2px 6px;}
+.checkout {background:#ff9900; color:#fff; padding:10px; border:none; width:100%; border-radius:4px; cursor:pointer; font-weight:bold;}
+@media(max-width:600px){.products{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));} header input{width:40%;}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">DF Plus Store</div>
+  <input type="text" id="search" placeholder="Search products...">
+  <div class="cart" id="cartBtn">Cart 🛒 <span id="cartCount">0</span></div>
+</header>
+
+<div class="hero">
+  <h1>Welcome to DF Plus Store!</h1>
+  <p>Browse top-quality computer & phone accessories and order instantly via WhatsApp</p>
+</div>
+
+<div class="filters">
+  <button class="active" data-category="All">All</button>
+  <button data-category="Computer">Computer</button>
+  <button data-category="Phone">Phone</button>
+</div>
+
+<div class="products" id="products"></div>
+
+<div class="cart-overlay" id="cartOverlay">
+  <h2>Your Cart</h2>
+  <div id="cartItems"></div>
+  <h3>Total: ₦<span id="cartTotal">0</span></h3>
+  <button class="checkout" id="checkoutBtn">Checkout via WhatsApp</button>
+</div>
+
+<script>
+let products = [];
+let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+function updateCartUI(){
+  const cartItems = document.getElementById('cartItems');
+  const cartTotal = document.getElementById('cartTotal');
+  const cartCount = document.getElementById('cartCount');
+  cartItems.innerHTML = '';
+  let total = 0;
+  cart.forEach((item, idx)=>{
+    total += (item.price - (item.discount || 0)) * item.qty;
+    const div = document.createElement('div');
+    div.className = 'cart-item';
+    div.innerHTML = `
+      <img src="${item.image}" alt="${item.name}">
+      <div>${item.name}</div>
+      <div class="qty">
+        <button onclick="changeQty(${idx},-1)">-</button>
+        ${item.qty}
+        <button onclick="changeQty(${idx},1)">+</button>
+        <button onclick="removeItem(${idx})">❌</button>
+      </div>
+      <div>₦${(item.price - (item.discount || 0))*item.qty}</div>
+    `;
+    cartItems.appendChild(div);
+  });
+  cartTotal.textContent = total;
+  cartCount.textContent = cart.length;
+  localStorage.setItem('cart', JSON.stringify(cart));
+}
+
+function changeQty(idx, delta){
+  cart[idx].qty += delta;
+  if(cart[idx].qty <= 0) removeItem(idx);
+  else updateCartUI();
+}
+
+function removeItem(idx){
+  cart.splice(idx,1);
+  updateCartUI();
+}
+
+document.getElementById('cartBtn').addEventListener('click', ()=>{
+  document.getElementById('cartOverlay').classList.toggle('active');
+});
+
+document.getElementById('checkoutBtn').addEventListener('click', ()=>{
+  if(cart.length==0){alert("Cart is empty"); return;}
+  let text = 'Hello, I want to order:\n';
+  cart.forEach(item=>{
+    text += `${item.name} x${item.qty} - ₦${(item.price-(item.discount||0))*item.qty}\n`;
+  });
+  const url = 'https://wa.me/234000000000?text='+encodeURIComponent(text);
+  window.open(url,'_blank');
+});
+
+document.querySelectorAll('.filters button').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.filters button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderProducts(btn.dataset.category);
+  });
+});
+
+document.getElementById('search').addEventListener('input', e=>{
+  renderProducts(document.querySelector('.filters button.active').dataset.category, e.target.value);
+});
+
+function renderProducts(category='All', search=''){
+  const container = document.getElementById('products');
+  container.innerHTML='';
+  products.filter(p=>{
+    return (category==='All'||p.category===category) &&
+           (!search||p.name.toLowerCase().includes(search.toLowerCase()));
+  }).forEach(p=>{
+    const div = document.createElement('div');
+    div.className='product';
+    const badge = p.discount>0 ? `<div class="badge">₦${p.discount} OFF</div>` : '';
+    div.innerHTML = `
+      ${badge}
+      <img src="${p.image}" alt="${p.name}">
+      <h3>${p.name}</h3>
+      <div class="price">
+        ${p.discount ? `<span class="old-price">₦${p.price}</span> ₦${p.price-p.discount}` : `₦${p.price}`}
+      </div>
+      <button onclick="addToCart('${p.name}',${p.price},${p.discount || 0},'${p.image}')">Add to Cart</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function addToCart(name,price,discount,image){
+  const idx = cart.findIndex(i=>i.name===name);
+  if(idx>=0) cart[idx].qty++;
+  else cart.push({name,price,discount,image,qty:1});
+  updateCartUI();
+}
+
+// Load CSV products
+Papa.parse('products.csv',{
+  download:true,
+  header:true,
+  complete:function(results){
+    products = results.data;
+    renderProducts();
+  }
+});
+
+updateCartUI();
+</script>
+</body>
+</html>
